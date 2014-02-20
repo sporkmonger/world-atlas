@@ -1,12 +1,13 @@
 TOPOJSON = node_modules/.bin/topojson -q 1e5
 
 COLLECTIONS = \
-	ne_10m_admin_0_countries \
-	ne_10m_admin_0_countries_lakes \
-	ne_10m_admin_1_states_provinces \
-	ne_10m_admin_1_states_provinces_lakes \
-	ne_10m_us_states \
-	ne_10m_us_states_lakes
+	ne_50m_admin_0_countries \
+	ne_50m_admin_0_countries_lakes \
+	ne_50m_admin_1_states_provinces \
+	ne_50m_admin_1_states_provinces_lakes \
+	ne_50m_us_states \
+	ne_50m_us_states_lakes \
+	ne_50m_populated_places_simple
 
 all: node_modules $(addprefix topo/,$(addsuffix .json,$(COLLECTIONS)))
 
@@ -28,6 +29,11 @@ zip/ne_10m_%.zip:
 zip/ne_50m_land.zip:
 	mkdir -p $(dir $@)
 	curl "http://www.nacis.org/naturalearth/50m/physical/ne_50m_land.zip" -o $@.download
+	mv $@.download $@
+
+zip/ne_50m_populated_places_simple.zip:
+	mkdir -p $(dir $@)
+	curl "http://www.nacis.org/naturalearth/50m/cultural/ne_50m_populated_places_simple.zip" -o $@.download
 	mv $@.download $@
 
 zip/ne_50m_%.zip:
@@ -79,6 +85,13 @@ shp/ne_%_admin_1_states_provinces_lakes.shp: zip/ne_%_admin_1_states_provinces_l
 	for file in shp/ne_$*_admin_1_states_provinces_lakes_shp.*; do mv $$file shp/ne_$*_admin_1_states_provinces_lakes"$${file#*_shp}"; done
 	touch $@
 
+# Populated Places
+shp/ne_%_populated_places_simple.shp: zip/ne_%_populated_places_simple.zip
+	mkdir -p $(dir $@)
+	unzip -d shp $<
+	for file in shp/ne_$*_populated_places_simple_shp.*; do mv $$file shp/ne_$*_populated_places_simple"$${file#*_shp}"; done
+	touch $@
+
 geo/ne_%_us_states.json: shp/ne_%_admin_1_states_provinces.shp
 	mkdir -p $(dir $@)
 	rm -f $@
@@ -99,6 +112,10 @@ topo/ne_%_us_states_lakes.json: geo/ne_%_us_states_lakes.json
 topo/world-%.json: shp/ne_%_land.shp shp/ne_%_admin_0_countries.shp
 	mkdir -p $(dir $@)
 	$(TOPOJSON) --id-property=+iso_n3 -- land=shp/ne_$*_land.shp countries=shp/ne_$*_admin_0_countries.shp | ./topomerge land > $@
+
+topo/ne_%_populated_places_simple.json: shp/ne_%_populated_places_simple.shp
+	mkdir -p $(dir $@)
+	$(TOPOJSON) --id-property=nameascii -o $@ -- $<
 
 topo/%.json: shp/%.shp
 	mkdir -p $(dir $@)
